@@ -265,6 +265,7 @@ class TrainingService:
         best_rmse = np.inf
         best_metrics: Dict[str, float] = {}
         best_predictions: np.ndarray | None = None
+        sample_count = len(y_test)
 
         def _safe_metric(value: float) -> float:
             """Evita NaN/inf en métricas (r2 puede ser indefinido con pocos datos)."""
@@ -282,7 +283,14 @@ class TrainingService:
             mae = _safe_metric(mean_absolute_error(y_test, preds))
             safe_y_test = y_test.replace(0, 1e-3)
             mape = _safe_metric(mean_absolute_percentage_error(safe_y_test, preds))
-            r2 = _safe_metric(r2_score(y_test, preds))
+            if sample_count >= 2:
+                r2 = _safe_metric(r2_score(y_test, preds))
+            else:
+                # Evitamos warnings de sklearn cuando solo hay un punto en test.
+                logger.debug(
+                    "Omitiendo r2: solo hay %s muestra(s) en test", sample_count
+                )
+                r2 = 0.0
 
             evaluated.append(
                 {
@@ -291,7 +299,7 @@ class TrainingService:
                     "mae": mae,
                     "mape": mape,
                     "r2": r2,
-                    "samples": len(y_test),
+                    "samples": sample_count,
                 }
             )
 
