@@ -266,6 +266,10 @@ class TrainingService:
         best_metrics: Dict[str, float] = {}
         best_predictions: np.ndarray | None = None
 
+        def _safe_metric(value: float) -> float:
+            """Evita NaN/inf en métricas (r2 puede ser indefinido con pocos datos)."""
+            return float(value) if np.isfinite(value) else 0.0
+
         for name, estimator in candidates:
             # memory=None se declara explícitamente para cumplir guideline de cacheo en sklearn Pipeline.
             pipeline = Pipeline(
@@ -274,11 +278,11 @@ class TrainingService:
             )
             pipeline.fit(X_train, y_train)
             preds = np.asarray(pipeline.predict(X_test))
-            rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
-            mae = float(mean_absolute_error(y_test, preds))
+            rmse = _safe_metric(np.sqrt(mean_squared_error(y_test, preds)))
+            mae = _safe_metric(mean_absolute_error(y_test, preds))
             safe_y_test = y_test.replace(0, 1e-3)
-            mape = float(mean_absolute_percentage_error(safe_y_test, preds))
-            r2 = float(r2_score(y_test, preds))
+            mape = _safe_metric(mean_absolute_percentage_error(safe_y_test, preds))
+            r2 = _safe_metric(r2_score(y_test, preds))
 
             evaluated.append(
                 {
