@@ -12,7 +12,9 @@ class PredictionRequest(BaseModel):
     vehicle_type: str = Field(..., description="Tipo de vehiculo (CAR/MOTORCYCLE)")
     brand: str
     model: str
-    line: str
+    line: str | None = Field(
+        None, description="Línea/versión (opcional, se usa fallback por modelo)"
+    )
     horizon_months: int = Field(6, gt=0, le=24)
     confidence: float = Field(0.95, ge=0.5, le=0.99)
 

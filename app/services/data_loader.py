@@ -117,7 +117,13 @@ class VehicleClient:
                         continue
                     response.raise_for_status()
                     payload = response.json()
-                    payload["vehicleType"] = vehicle_type or payload.get("vehicleType")
+                    resolved_type = (
+                        vehicle_type
+                        or payload.get("vehicleType")
+                        or payload.get("type")
+                        or ("CAR" if endpoint == "cars" else "MOTORCYCLE")
+                    )
+                    payload["vehicleType"] = resolved_type
                     return payload
 
         logger.warning("Vehiculo %s no encontrado en inventario", vehicle_id)

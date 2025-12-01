@@ -20,7 +20,7 @@ from app.models.prediction_model import (
 router = APIRouter(prefix="/v1/ml", tags=["prediction"])
 settings = get_settings()
 require_permissions_predict = (
-    require_permissions(settings.permissions_predict)
+    require_internal_or_permissions(settings.permissions_predict)
     if settings.permissions_predict
     else require_token
 )
