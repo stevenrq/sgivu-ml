@@ -78,6 +78,11 @@ Servicio FastAPI para estimar demanda mensual de vehiculos usados por tipo/marca
 - Autorización por permisos (claim `rolesAndPermissions`): por defecto se exigen `ml:predict`, `ml:retrain` y `ml:models` para `/v1/predict`, `/v1/retrain` y `/v1/models/latest` respectivamente (misma convención `recurso:accion` que en los demás servicios). Puedes ajustar vía `PERMISSIONS_PREDICT`, `PERMISSIONS_RETRAIN` y `PERMISSIONS_MODELS` (listas separadas por coma); si las dejas vacías, cualquier JWT válido pasa.
 - Para llamadas internas sin usuario se puede usar `SERVICE_INTERNAL_SECRET_KEY` (service-to-service).
 
+## 📐 Diagramas
+- Contexto del servicio: `docs/architecture/services/sgivu-ml-context.puml`
+- Componentes (FastAPI, loaders, registry): `docs/architecture/services/sgivu-ml-components.puml`
+- Modelo de datos (Pydantic requests/responses, metadata): `docs/architecture/datamodel/sgivu-ml-datamodel.puml`
+
 ## Docker
 
 - `Dockerfile` basado en Python 3.12 slim, instala dependencias cientificas y ejecuta `run.sh`.

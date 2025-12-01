@@ -33,3 +33,8 @@
 - Configuración via variables de entorno (.env opcional): URLs de gateway (`SGIVU_PURCHASE_SALE_URL`, `SGIVU_VEHICLE_URL`), permisos (`PERMISSIONS_*`), y clave interna (`SERVICE_INTERNAL_SECRET_KEY`).
 - OIDC: puedes apuntar `SGIVU_AUTH_DISCOVERY_URL` al `.well-known/openid-configuration`; el servicio cachea JWKS durante 1h.
 - Evita commitear artefactos reales de `models/`; usa el volumen o directorio local ignorado para experimentos.
+
+## Architecture Docs
+- Service context: `docs/architecture/services/sgivu-ml-context.puml`
+- Components (FastAPI, loader, training): `docs/architecture/services/sgivu-ml-components.puml`
+- Data model (Pydantic requests/responses, metadata): `docs/architecture/datamodel/sgivu-ml-datamodel.puml`

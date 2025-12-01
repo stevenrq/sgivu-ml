@@ -1,0 +1,24 @@
+@startuml
+' Contexto sgivu-ml (FastAPI).
+' Basado en: app/routers/prediction_router.py, services/data_loader.py (HTTPX a purchase-sale y vehicle),
+' core/config.py (.env.dev variables), GatewayRoutesConfig (ruta /v1/ml/**).
+left to right direction
+
+actor "Usuario/Analista" as User
+rectangle "Frontend Angular" as Frontend
+rectangle "API Gateway" as Gateway
+rectangle "Auth Service\n(JWKS discovery)" as Auth
+rectangle "Purchase/Sale Service" as PurchaseSvc
+rectangle "Vehicle Service" as VehicleSvc
+rectangle "ML Service\n(sgivu-ml FastAPI)" as MLSvc
+rectangle "Modelos en disco\n(models/)" as Models
+
+User --> Frontend : Solicita predicción
+Frontend --> Gateway : /v1/ml/predict|retrain
+Gateway --> MLSvc : Proxy HTTP\n(circuit breaker)
+MLSvc --> Auth : Descubrimiento OIDC\n(validar JWT)
+MLSvc --> PurchaseSvc : HTTPX\n/v1/purchase-sales/search
+MLSvc --> VehicleSvc : HTTPX\n/v1/cars|motorcycles/{id}
+MLSvc --> Models : Carga y guarda\npipelines entrenados
+
+@enduml

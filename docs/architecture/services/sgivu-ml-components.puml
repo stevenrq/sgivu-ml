@@ -1,0 +1,50 @@
+@startuml
+' Componentes sgivu-ml (FastAPI).
+' Basado en: app/main.py (app FastAPI + router), routers/prediction_router.py,
+' services/prediction.py|training.py|data_loader.py|model_registry.py,
+' core/config.py y core/security.py (autorización JWT/clave interna).
+left to right direction
+
+package "API FastAPI" {
+  component "main.py\n(FastAPI app + /health)" as Main
+  component "prediction_router\n(/v1/ml/predict,\n/retrain,\n/models/latest)" as Router
+}
+
+package "Servicios de Dominio" {
+  component "PredictionService\n(orquesta inferencia/retrain)" as PredictionSvc
+  component "TrainingService\n(feature engineering + sklearn)" as TrainingSvc
+  component "DemandDatasetLoader\n(PurchaseSaleClient + VehicleClient)" as Loader
+  component "ModelRegistry\n(guardar/cargar modelos)" as Registry
+}
+
+package "Integraciones HTTP" {
+  component "PurchaseSaleClient\n(httpx -> /v1/purchase-sales/search)" as PurchaseClient
+  component "VehicleClient\n(httpx -> /v1/cars|motorcycles/{id})" as VehicleClient
+}
+
+package "Config/Security" {
+  component "Settings (.env)\n(sgivu_auth_discovery_url,\nservice_internal_secret_key,\nmodel_dir...)" as Settings
+  component "core.security\n(require_token,\nrequire_internal_or_permissions)" as Security
+}
+
+component "Modelos en disco\n(models/*.joblib)" as ModelFiles
+
+Main --> Router
+Router --> PredictionSvc
+PredictionSvc --> Loader
+PredictionSvc --> TrainingSvc
+PredictionSvc --> Registry
+TrainingSvc --> Registry
+Loader --> PurchaseClient
+Loader --> VehicleClient
+
+PurchaseClient ..> Security : Header X-Internal-Service-Key
+VehicleClient ..> Security
+PredictionSvc ..> Security : Validación JWT/permissions
+Main ..> Settings
+PredictionSvc ..> Settings
+TrainingSvc ..> Settings
+Loader ..> Settings
+Registry --> ModelFiles
+
+@enduml

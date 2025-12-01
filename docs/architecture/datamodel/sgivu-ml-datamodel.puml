@@ -1,0 +1,54 @@
+@startuml
+' Modelo de datos sgivu-ml.
+' Basado en Pydantic models (prediction_model.py) y metadata usada en ModelRegistry/TrainingService.
+left to right direction
+
+class PredictionRequest {
+  +vehicle_type: str
+  +brand: str
+  +model: str
+  +line: str?
+  +horizon_months: int
+  +confidence: float
+}
+
+class MonthlyPrediction {
+  +month: str
+  +demand: float
+  +lower_ci: float
+  +upper_ci: float
+}
+
+class PredictionResponse {
+  +predictions: List<MonthlyPrediction>
+  +model_version: str
+  +metrics: Dict
+}
+
+class RetrainRequest {
+  +start_date: date?
+  +end_date: date?
+}
+
+class RetrainResponse {
+  +version: str
+  +metrics: Dict
+  +trained_at: str
+  +samples: {train,test,total}
+}
+
+class ModelMetadata {
+  +version: str
+  +trained_at: datetime
+  +metrics: {rmse, mae, mape, r2, residual_std}
+}
+
+PredictionResponse --> MonthlyPrediction
+RetrainResponse --> ModelMetadata
+
+note bottom of ModelMetadata
+  Persistida en disco junto al modelo
+  dentro de models/<model_name> (ModelRegistry).
+end note
+
+@enduml
