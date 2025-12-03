@@ -28,3 +28,4 @@ pip-wheel-metadata/
 profile_default/
 pyvenv.cfg
 venv/
+/tests/models_offline/

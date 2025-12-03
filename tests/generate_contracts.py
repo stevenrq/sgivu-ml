@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import csv
 import random
 from datetime import datetime, timedelta, date
@@ -114,6 +115,73 @@ vehicle_types_by_brand = {
     "Chevrolet": VEHICLE_TYPE_CAR,
     "Renault": VEHICLE_TYPE_CAR,
     "Ford": VEHICLE_TYPE_CAR,
+}
+
+# Constantes para segmentos populares (evita duplicar literales).
+POPULAR_YAMAHA_FZ = "FZ 2.0"
+POPULAR_YAMAHA_MT = "MT-03"
+POPULAR_KAWASAKI_NINJA = "Ninja 300"
+POPULAR_MAZDA_3 = "3 Touring"
+
+# Líneas/submodelos por modelo (se usa una variante al azar).
+vehicle_lines = {
+    "Yamaha": {
+        "FZ 2.0": ["FZN-150", "FZ-S", "FZ16"],
+        "MT-03": ["MT", "MT ABS", "MT SPORT"],
+        "NMAX": ["NMAX 155", "NMAX Connected"],
+        "XTZ 250": ["XTZ Adventure", "XTZ Rally"],
+        "R3": ["R3 ABS", "R3 Monster"],
+    },
+    "Honda": {
+        "CB 190R": ["CBR-R", "190R"],
+        "Wave 110": ["Wave Alpha"],
+        "XR 150L": ["XR Work", "XR Trail"],
+        "PCX 150": ["PCX Deluxe", "PCX ABS"],
+    },
+    "Bajaj": {
+        "Pulsar 200NS": ["NS", "NS FI"],
+        "Boxer CT100": ["CT100 KS", "CT100 ES"],
+        "Discover 125": ["Discover", "Discover ST"],
+        "Dominar 400": ["Dominar UG", "Dominar Touring"],
+    },
+    "Suzuki": {
+        "Gixxer 155": ["Gixxer", "Gixxer SF"],
+        "GN 125": ["GN125", "GN125H"],
+        "AX4": ["AX4 Work"],
+        "DR 650": ["DR650 Rally", "DR650 SE"],
+    },
+    "Kawasaki": {
+        "Z400": ["Z400 Naked"],
+        "Ninja 300": ["Ninja 300 KRT", "Ninja 300 ABS"],
+        "Versys 650": ["Versys Tourer", "Versys LT"],
+    },
+    "Mazda": {
+        "3 Touring": ["Touring LX", "Touring Sport"],
+        "CX-5": ["CX-5 Grand Touring", "CX-5 Sport"],
+        "2 Sedan": ["2 Prime", "2 Grand Touring"],
+    },
+    "Hyundai": {
+        "i25": ["i25 GL", "i25 Sedan"],
+        "Tucson": ["Tucson GLS", "Tucson Turbo"],
+        "Elantra": ["Elantra Value", "Elantra Limited"],
+    },
+    "Chevrolet": {
+        "Onix": ["Onix LT", "Onix Premier"],
+        "Tracker": ["Tracker LS", "Tracker LTZ"],
+        "Sail": ["Sail LS", "Sail LT"],
+        "Spark GT": ["Spark GT LT", "Spark GT Activ"],
+    },
+    "Renault": {
+        "Logan": ["Logan Zen", "Logan Intens"],
+        "Sandero": ["Sandero Life", "Sandero GT"],
+        "Duster": ["Duster Zen", "Duster Intens"],
+        "Kwid": ["Kwid Outsider", "Kwid Zen"],
+    },
+    "Ford": {
+        "Fiesta": ["Fiesta SE", "Fiesta Titanium"],
+        "Ranger": ["Ranger XLS", "Ranger XLT"],
+        "Explorer": ["Explorer XLT", "Explorer Limited"],
+    },
 }
 
 payment_methods = [
@@ -233,6 +301,13 @@ def random_plate():
     return f"{letters}-{numbers}"
 
 
+def random_line_for_model(brand: str, model: str) -> str:
+    """Devuelve una línea/submodelo plausible para la marca/modelo dado."""
+    brand_lines = vehicle_lines.get(brand, {})
+    options = brand_lines.get(model) or [model]
+    return random.choice(options)
+
+
 def random_vehicle():
     popular_combos = [
         ("Yamaha", POPULAR_YAMAHA_MT),
@@ -251,7 +326,9 @@ def random_vehicle():
         model = random.choice(vehicle_brands_models[brand])
 
     plate = random_plate()
-    return brand, model, plate, vehicle_types_by_brand[brand]
+    # Línea/submodelo para enriquecer el CSV (aparece en el real).
+    line = random_line_for_model(brand, model)
+    return brand, model, line, plate, vehicle_types_by_brand[brand]
 
 
 def random_prices(brand, dt):
@@ -327,6 +404,7 @@ def generate_csv(path, n):
             "Email del usuario",
             "Marca del vehículo",
             "Modelo del vehículo",
+            "Línea del vehículo",
             "Placa del vehículo",
             "Tipo de vehículo",
             "Estado del vehículo",
@@ -352,7 +430,7 @@ def generate_csv(path, n):
 
             user_name, username, user_email = random.choice(users_responsables)
 
-            brand, model, plate, vtype = random_vehicle()
+            brand, model, line, plate, vtype = random_vehicle()
 
             # Probabilidad de venta con estacionalidad y ruido para generar dispersion.
             sale_prob = SALE_PROBABILITY * seasonality.get(creation.month, 1.0)
@@ -387,6 +465,7 @@ def generate_csv(path, n):
                 user_email,
                 brand,
                 model,
+                line,
                 plate,
                 vtype,
                 "",
@@ -407,8 +486,3 @@ def generate_csv(path, n):
 
 if __name__ == "__main__":
     generate_csv(OUTPUT_FILE, NUM_CONTRACTS)
-# Constantes para segmentos populares (evita duplicar literales).
-POPULAR_YAMAHA_FZ = "FZ 2.0"
-POPULAR_YAMAHA_MT = "MT-03"
-POPULAR_KAWASAKI_NINJA = "Ninja 300"
-POPULAR_MAZDA_3 = "3 Touring"

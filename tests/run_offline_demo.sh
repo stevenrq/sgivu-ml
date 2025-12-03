@@ -5,8 +5,8 @@ set -euo pipefail
 # - PYTHON_BIN: intérprete a usar (por defecto python3).
 # - --csv: ruta al archivo de contratos CSV.
 # - --horizon: meses a pronosticar.
-# - --vehicle-type/--brand/--model/--line: segmento que se desea predecir (la línea es opcional).
-# Ajusta los argumentos si deseas probar otro segmento o archivo.
+# - --vehicle-type/--brand/--model/--line: segmento que se desea predecir (la línea es obligatoria).
+# Ajusta los argumentos si deseas probar otro segmento o archivo. Mantén --line con un valor no vacío.
 
 PYTHON_BIN=${PYTHON_BIN:-python3}
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || { echo "No se encontro $PYTHON_BIN en PATH"; exit 1; }
@@ -16,9 +16,9 @@ export PYTHONPATH="${PYTHONPATH:-$ROOT_DIR}"
 
 "$PYTHON_BIN" "$ROOT_DIR/tests/csv_offline_demo.py" \
   --csv "$ROOT_DIR/tests/data/synthetic_contracts.csv" \
-  --horizon 6 \
-  --vehicle-type CAR \
-  --brand FORD \
-  --model "Fiesta" \
-   --line "" \
+  --horizon 5 \
+  --vehicle-type MOTORCYCLE \
+  --brand YAMAHA \
+  --model "MT-03" \
+  --line "MT" \
   --plot "$ROOT_DIR/tests/data/forecast.png"

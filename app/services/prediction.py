@@ -10,6 +10,10 @@ from fastapi import HTTPException, status
 
 from app.core.config import Settings, get_settings
 from app.services.data_loader import DemandDatasetLoader
+from app.services.normalization import (
+    canonicalize_brand_model,
+    canonicalize_label,
+)
 from app.services.model_registry import ModelRegistry
 from app.services.training import TrainingService
 
@@ -105,28 +109,37 @@ class PredictionService:
         raw_df = await self.loader.load_transactions()
         feature_df = self.trainer.build_feature_table(raw_df)
 
-        normalized_filters = {
-            key: (value.upper().strip() if isinstance(value, str) else value)
-            for key, value in filters.items()
-        }
+        normalized_filters: Dict[str, Any] = {}
+        normalized_filters["vehicle_type"] = canonicalize_label(
+            filters.get("vehicle_type")
+        )
+        normalized_brand, normalized_model = canonicalize_brand_model(
+            filters.get("brand"), filters.get("model")
+        )
+        normalized_filters["brand"] = normalized_brand
+        normalized_filters["model"] = normalized_model
+        normalized_filters["line"] = canonicalize_label(filters.get("line"))
+        if not normalized_filters["line"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Falta la línea del vehículo. Incluye brand/model/line completos para predecir.",
+            )
+
         mask_base = (
             (feature_df["vehicle_type"] == normalized_filters.get("vehicle_type"))
             & (feature_df["brand"] == normalized_filters.get("brand"))
             & (feature_df["model"] == normalized_filters.get("model"))
+            & (feature_df["line"] == normalized_filters.get("line"))
         )
-        mask_with_line = mask_base & (
-            feature_df["line"] == normalized_filters.get("line")
-        )
-
-        history = feature_df[mask_with_line].copy()
-        if history.empty:
-            # Fallback: predecir a nivel modelo ignorando línea para evitar sobre-segmentar.
-            history = feature_df[mask_base].copy()
+        history = feature_df[mask_base].copy()
 
         if history.empty:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No se encontro historial para la combinacion solicitada.",
+                detail=(
+                    "No se encontró historial para la combinación solicitada. "
+                    "Verifica vehicle_type/brand/model/line o reentrena con datos que incluyan ese segmento."
+                ),
             )
 
         history = history.sort_values("event_month")
@@ -134,6 +147,83 @@ class PredictionService:
         return {
             "predictions": forecast,
             "model_version": metadata["version"],
+            "metrics": metadata.get("metrics"),
+        }
+
+    async def predict_with_history(
+        self, filters: Dict[str, Any], horizon: int, confidence: float = 0.95
+    ) -> Dict[str, Any]:
+        """Pronóstico + historial mensual para graficar en frontend."""
+        if not self.loader:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No hay loader de datos configurado para predecir.",
+            )
+        try:
+            model, metadata = self.registry.load_latest()
+        except FileNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Aun no existe un modelo entrenado.",
+            ) from exc
+
+        raw_df = await self.loader.load_transactions()
+        feature_df = self.trainer.build_feature_table(raw_df)
+
+        normalized_filters: Dict[str, Any] = {}
+        normalized_filters["vehicle_type"] = canonicalize_label(
+            filters.get("vehicle_type")
+        )
+        normalized_brand, normalized_model = canonicalize_brand_model(
+            filters.get("brand"), filters.get("model")
+        )
+        normalized_filters["brand"] = normalized_brand
+        normalized_filters["model"] = normalized_model
+        normalized_filters["line"] = canonicalize_label(filters.get("line"))
+        if not normalized_filters["line"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Falta la línea del vehículo. Incluye brand/model/line completos para predecir.",
+            )
+
+        mask_base = (
+            (feature_df["vehicle_type"] == normalized_filters.get("vehicle_type"))
+            & (feature_df["brand"] == normalized_filters.get("brand"))
+            & (feature_df["model"] == normalized_filters.get("model"))
+            & (feature_df["line"] == normalized_filters.get("line"))
+        )
+        history = feature_df[mask_base].copy()
+
+        if history.empty:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    "No se encontró historial para la combinación solicitada. "
+                    "Verifica vehicle_type/brand/model/line o reentrena con datos que incluyan ese segmento."
+                ),
+            )
+
+        history = history.sort_values("event_month")
+        forecast = self._forecast(model, metadata, history, horizon, confidence)
+        history_payload = [
+            {
+                "month": ts.date().isoformat(),
+                "sales_count": float(sc),
+            }
+            for ts, sc in zip(history["event_month"], history["sales_count"])
+        ]
+
+        return {
+            "predictions": forecast,
+            "history": history_payload,
+            "segment": {
+                "vehicle_type": normalized_filters["vehicle_type"],
+                "brand": normalized_filters["brand"],
+                "model": normalized_filters["model"],
+                "line": normalized_filters["line"],
+            },
+            "model_version": metadata["version"],
+            "trained_at": metadata.get("trained_at"),
             "metrics": metadata.get("metrics"),
         }
 

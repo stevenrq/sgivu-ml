@@ -20,6 +20,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from app.core.config import Settings, get_settings
+from app.services.normalization import (
+    canonicalize_brand_model,
+    canonicalize_label,
+)
 from app.services.model_registry import ModelRegistry
 
 try:
@@ -41,7 +45,7 @@ class TrainingService:
 
     # Agrupamos por tipo+marca+modelo para evitar sobre-segmentar por placa/línea.
     category_cols = ["vehicle_type", "brand", "model"]
-    # Se mantiene "line" como feature opcional (codificada) para capturar variaciones dentro del modelo.
+    # Se mantiene "line" como feature codificada para capturar variaciones dentro del modelo.
     optional_category_cols = ["line"]
     numeric_cols = [
         "purchases_count",
@@ -74,11 +78,25 @@ class TrainingService:
             return df
 
         work_df = df.copy()
+        if "line" not in work_df.columns:
+            raise ValueError("La columna 'line' es obligatoria para entrenar el modelo.")
         for col in self.category_cols + self.optional_category_cols:
             if col in work_df:
-                work_df[col] = (
-                    work_df[col].fillna("UNKNOWN").astype(str).str.upper().str.strip()
+                work_df[col] = work_df[col].fillna("UNKNOWN").apply(canonicalize_label)
+        if "line" in work_df:
+            missing_lines = (work_df["line"] == "") | (work_df["line"] == "UNKNOWN")
+            if missing_lines.any():
+                raise ValueError(
+                    "Todos los registros deben tener línea de vehículo (no vacía)."
                 )
+        if "brand" in work_df and "model" in work_df:
+            # Consolida alias de marca/modelo para evitar segmentos duplicados.
+            pairs = work_df[["brand", "model"]].apply(
+                lambda row: canonicalize_brand_model(row["brand"], row["model"]),
+                axis=1,
+                result_type="expand",
+            )
+            work_df[["brand", "model"]] = pairs.values
         work_df["event_date"] = pd.to_datetime(
             work_df["updated_at"].fillna(work_df["created_at"]), utc=True
         ).dt.tz_localize(None)

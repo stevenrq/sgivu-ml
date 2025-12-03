@@ -13,6 +13,7 @@ from app.models.prediction_model import (
     MonthlyPrediction,
     PredictionRequest,
     PredictionResponse,
+    PredictionWithHistoryResponse,
     RetrainRequest,
     RetrainResponse,
 )
@@ -57,6 +58,24 @@ async def predict(
         confidence=request.confidence,
     )
     return PredictionResponse(**payload)
+
+
+@router.post(
+    "/predict-with-history",
+    response_model=PredictionWithHistoryResponse,
+    dependencies=[Depends(require_permissions_predict)],
+    summary="Predice y entrega historial mensual para graficar",
+)
+async def predict_with_history(
+    request: PredictionRequest, service=Depends(get_prediction_service)
+) -> PredictionWithHistoryResponse:
+    """Endpoint para frontend: pronóstico + serie histórica del segmento."""
+    payload = await service.predict_with_history(
+        filters=request.model_dump(exclude={"horizon_months", "confidence"}),
+        horizon=request.horizon_months,
+        confidence=request.confidence,
+    )
+    return PredictionWithHistoryResponse(**payload)
 
 
 @router.post(

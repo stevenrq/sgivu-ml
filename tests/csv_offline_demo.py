@@ -38,6 +38,10 @@ import pandas as pd
 
 from app.core.config import Settings
 from app.services.model_registry import ModelRegistry
+from app.services.normalization import (
+    canonicalize_brand_model,
+    canonicalize_label,
+)
 from app.services.prediction import PredictionService
 from app.services.training import TrainingService
 
@@ -262,6 +266,15 @@ def plot_forecast(
     labels = [f"{month_names[m.month-1]} {m.year}" for m in all_months]
     plt.xticks(all_months_np, labels, rotation=45)
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    all_y_values = (
+        list(y_hist.values if hasattr(y_hist, "values") else y_hist)
+        + y
+        + upper
+        + lower
+    )
+    max_y = max(all_y_values) if all_y_values else 1.0
+    max_y = max(max_y, 1.0)
+    ax.set_ylim(0, max_y * 1.2)
     plt.grid(True, axis="y", linestyle="--", alpha=0.3)
     for spine in ["top", "right"]:
         ax.spines[spine].set_visible(False)
@@ -296,13 +309,34 @@ def run(
         settings=settings,
     )
 
+    canonical_type = canonicalize_label(filters["vehicle_type"])
+    canonical_brand, canonical_model = canonicalize_brand_model(
+        filters["brand"], filters["model"]
+    )
+    canonical_line = canonicalize_label(filters.get("line", ""))
+    if not canonical_type or not canonical_brand or not canonical_model:
+        logger.error(
+            "Parámetros obligatorios faltantes: vehicle_type, brand y model deben tener valor."
+        )
+        return
+    if not canonical_line:
+        logger.error("La línea del vehículo es obligatoria y no puede estar vacía.")
+        return
+    if canonical_line == "UNKNOWN":
+        logger.error("La línea del vehículo no puede ser UNKNOWN.")
+        return
+
     df = load_csv(csv_path)
     if df.empty:
         logger.error("El CSV no tiene filas.")
         return
 
     logger.info("Filas cargadas: %s", len(df))
-    metadata = trainer.train(df)
+    try:
+        metadata = trainer.train(df)
+    except ValueError as exc:
+        logger.error("No se pudo entrenar el modelo: %s", exc)
+        return
     logger.info(
         "Modelo entrenado. Version: %s | Metricas: %s",
         metadata["version"],
@@ -310,19 +344,20 @@ def run(
     )
 
     feature_df = trainer.build_feature_table(df)
+
     base_mask = (
-        (feature_df["vehicle_type"] == _normalize(filters["vehicle_type"]))
-        & (feature_df["brand"] == _normalize(filters["brand"]))
-        & (feature_df["model"] == _normalize(filters["model"]))
+        (feature_df["vehicle_type"] == canonical_type)
+        & (feature_df["brand"] == canonical_brand)
+        & (feature_df["model"] == canonical_model)
     )
-    mask_with_line = base_mask & (
-        feature_df["line"] == _normalize(filters.get("line", ""))
-    )
+    mask_with_line = base_mask & (feature_df["line"] == canonical_line)
     history = feature_df[mask_with_line].copy()
     if history.empty:
-        history = feature_df[base_mask].copy()
-    if history.empty:
-        logger.error("No hay historial para los filtros proporcionados: %s", filters)
+        logger.error(
+            "No hay historial para los filtros solicitados: %s. "
+            "Verifica que la marca/modelo/línea existan en el CSV.",
+            filters,
+        )
         return
 
     model, metadata = registry.load_latest()
@@ -364,9 +399,7 @@ if __name__ == "__main__":
     parser.add_argument("--vehicle-type", required=True, help="CAR o MOTORCYCLE.")
     parser.add_argument("--brand", required=True, help="Marca (ej: YAMAHA).")
     parser.add_argument("--model", required=True, help="Modelo (ej: MT-03).")
-    parser.add_argument(
-        "--line", required=False, default="", help="Linea/submodelo (opcional)."
-    )
+    parser.add_argument("--line", required=True, help="Linea/submodelo (obligatoria).")
     parser.add_argument(
         "--plot",
         required=False,
