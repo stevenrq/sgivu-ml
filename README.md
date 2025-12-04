@@ -88,6 +88,13 @@ Servicio FastAPI para estimar demanda mensual de vehiculos usados por tipo/marca
 - `Dockerfile` basado en Python 3.12 slim, instala dependencias cientificas y ejecuta `run.sh`.
 - En `docker-compose.dev.yml` se agregó el servicio `sgivu-ml` (puerto 8000) con volumen `sgivu-ml-models` para persistir artefactos. Variables `SGIVU_PURCHASE_SALE_URL` y `SGIVU_VEHICLE_URL` apuntan al gateway (`http://sgivu-gateway:8080`).
 
+## 🐳 Build & Push Docker
+
+- Ejecuta `./build-image.bash` desde esta carpeta para detener/borrar contenedores previos, limpiar la imagen
+  `stevenrq/sgivu-ml:v1` y construir/publicar la imagen con Docker (no usa Maven al ser un servicio Python).
+- El orquestador `../build-docker-images/build_push_all.bash` llama automáticamente a este script al construir todos los
+  servicios.
+
 ## Rendimiento y mejoras
 
 - Monitoreo de drift: comparar distribucion de `sales_count` y margen vs historico; agregar alerta si MAPE > 20% en ventana movil.
