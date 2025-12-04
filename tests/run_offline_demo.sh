@@ -16,7 +16,7 @@ export PYTHONPATH="${PYTHONPATH:-$ROOT_DIR}"
 
 "$PYTHON_BIN" "$ROOT_DIR/tests/csv_offline_demo.py" \
   --csv "$ROOT_DIR/tests/data/synthetic_contracts.csv" \
-  --horizon 5 \
+  --horizon 6 \
   --vehicle-type MOTORCYCLE \
   --brand YAMAHA \
   --model "MT-03" \
