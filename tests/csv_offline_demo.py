@@ -272,9 +272,17 @@ def plot_forecast(
         + upper
         + lower
     )
-    max_y = max(all_y_values) if all_y_values else 1.0
+    if all_y_values:
+        max_y = max(all_y_values)
+        min_y = min(all_y_values)
+    else:
+        max_y, min_y = 1.0, 0.0
+    # Evitar que los negativos se recorten: extender el eje si hay valores < 0.
     max_y = max(max_y, 1.0)
-    ax.set_ylim(0, max_y * 1.2)
+    min_y = min(min_y, 0.0)
+    span = max_y - min_y
+    padding = span * 0.2 if span > 0 else 1.0
+    ax.set_ylim(min_y - padding, max_y + padding)
     plt.grid(True, axis="y", linestyle="--", alpha=0.3)
     for spine in ["top", "right"]:
         ax.spines[spine].set_visible(False)

@@ -37,16 +37,16 @@ logger = logging.getLogger(__name__)
 class TrainingService:
     """Construye el dataset temporal y entrena el mejor modelo de demanda.
 
-    - Agrega contratos por mes y segmento (tipo + marca + modelo, línea opcional).
+    - Agrega contratos por mes y segmento (tipo + marca + modelo + línea).
     - Genera lags y rolling windows para capturar tendencia/estacionalidad.
     - Preprocesa categorías con OneHotEncoder y escala numéricos.
     - Evalúa candidatos (LR, RF, XGB) y selecciona por menor RMSE temporal.
     """
 
-    # Agrupamos por tipo+marca+modelo para evitar sobre-segmentar por placa/línea.
-    category_cols = ["vehicle_type", "brand", "model"]
-    # Se mantiene "line" como feature codificada para capturar variaciones dentro del modelo.
-    optional_category_cols = ["line"]
+    # Agrupamos por tipo+marca+modelo+línea para que el modelo sea específico del segmento exacto.
+    category_cols = ["vehicle_type", "brand", "model", "line"]
+    # Sin columnas categóricas opcionales: la línea ahora es obligatoria en el entrenamiento.
+    optional_category_cols: list[str] = []
     numeric_cols = [
         "purchases_count",
         "avg_margin",
@@ -139,23 +139,6 @@ class TrainingService:
         monthly["inventory_rotation"] = monthly["sales_count"] / monthly[
             "purchases_count"
         ].clip(lower=1)
-
-        # Añadir columnas categóricas opcionales (ej: line) con el modo por grupo mensual.
-        for opt_col in self.optional_category_cols:
-            if opt_col in work_df:
-                modes = (
-                    work_df.groupby(group_cols)[opt_col]
-                    .agg(lambda x: x.mode().iat[0] if not x.mode().empty else "UNKNOWN")
-                    .reset_index()
-                )
-                monthly = monthly.merge(modes, on=group_cols, how="left")
-                monthly[opt_col] = (
-                    monthly[opt_col]
-                    .fillna("UNKNOWN")
-                    .astype(str)
-                    .str.upper()
-                    .str.strip()
-                )
 
         monthly = self._add_time_features(monthly)
         grouped_frames = [

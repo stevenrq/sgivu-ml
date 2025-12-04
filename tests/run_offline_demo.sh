@@ -18,7 +18,7 @@ export PYTHONPATH="${PYTHONPATH:-$ROOT_DIR}"
   --csv "$ROOT_DIR/tests/data/synthetic_contracts.csv" \
   --horizon 6 \
   --vehicle-type MOTORCYCLE \
-  --brand YAMAHA \
+  --brand Yamaha \
   --model "MT-03" \
   --line "MT" \
   --plot "$ROOT_DIR/tests/data/forecast.png"

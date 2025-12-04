@@ -122,6 +122,14 @@ POPULAR_YAMAHA_FZ = "FZ 2.0"
 POPULAR_YAMAHA_MT = "MT-03"
 POPULAR_KAWASAKI_NINJA = "Ninja 300"
 POPULAR_MAZDA_3 = "3 Touring"
+TARGET_HEAVY_SALES = {
+    "brand": "Yamaha",
+    "model": POPULAR_YAMAHA_MT,
+    "line": "MT",
+    "vehicle_type": "Motocicleta",
+}
+# Ventas mínimas que queremos asegurar por mes para el segmento objetivo.
+MIN_TARGET_SALES_PER_MONTH = 5
 
 # Líneas/submodelos por modelo (se usa una variante al azar).
 vehicle_lines = {
@@ -375,6 +383,82 @@ def fmt(dt):
     return dt.strftime("%d/%m/%Y %H:%M")
 
 
+def write_contract(
+    writer,
+    creation: datetime,
+    contract_type: str,
+    brand: str,
+    model: str,
+    line: str,
+    plate: str,
+    vtype: str,
+):
+    """Escribe un contrato con datos sintéticos generados al vuelo."""
+    client_type = random.choice(client_types)
+    if client_type == "Empresa":
+        client, doc, email, phone = random_company_client()
+    else:
+        client, doc, email, phone = random_person_client()
+
+    user_name, username, user_email = random.choice(users_responsables)
+    pcompra, pventa = random_prices(brand, creation)
+    update = creation + timedelta(hours=random.randint(0, 200))
+
+    row = [
+        contract_type,
+        "Activa",
+        client,
+        client_type,
+        doc,
+        email,
+        phone,
+        user_name,
+        username,
+        user_email,
+        brand,
+        model,
+        line,
+        plate,
+        vtype,
+        "",
+        pcompra,
+        pventa,
+        random.choice(payment_methods),
+        random.choice(payment_terms),
+        random.choice(payment_limitations),
+        random.choice(observations_pool),
+        fmt(creation),
+        fmt(update),
+    ]
+    writer.writerow(row)
+
+
+def generate_target_segment_sales(writer):
+    """Garantiza ventas altas para la Yamaha MT-03 (línea MT) cada mes."""
+    for months_back in range(0, 12):  # últimos 12 meses
+        month_date = subtract_months(TODAY, months_back)
+        sales_this_month = random.randint(MIN_TARGET_SALES_PER_MONTH, MIN_TARGET_SALES_PER_MONTH + 3)
+        for _ in range(sales_this_month):
+            day = random.randint(1, 28)
+            creation = datetime(
+                month_date.year,
+                month_date.month,
+                day,
+                random.randint(0, 23),
+                random.randint(0, 59),
+            )
+            write_contract(
+                writer=writer,
+                creation=creation,
+                contract_type="Venta",
+                brand=TARGET_HEAVY_SALES["brand"],
+                model=TARGET_HEAVY_SALES["model"],
+                line=TARGET_HEAVY_SALES["line"],
+                plate=random_plate(),
+                vtype=TARGET_HEAVY_SALES["vehicle_type"],
+            )
+
+
 # -------------------------------------------------------------------
 # Generación del CSV
 # -------------------------------------------------------------------
@@ -419,17 +503,12 @@ def generate_csv(path, n):
         ]
         writer.writerow(headers)
 
+        # Ventas forzadas para MT-03 (línea MT) con demanda alta.
+        generate_target_segment_sales(writer)
+
+        # Resto de contratos aleatorios para diversidad del dataset.
         for _ in range(n):
             creation = random_datetime()
-
-            client_type = random.choice(client_types)
-            if client_type == "Empresa":
-                client, doc, email, phone = random_company_client()
-            else:
-                client, doc, email, phone = random_person_client()
-
-            user_name, username, user_email = random.choice(users_responsables)
-
             brand, model, line, plate, vtype = random_vehicle()
 
             # Probabilidad de venta con estacionalidad y ruido para generar dispersion.
@@ -447,41 +526,19 @@ def generate_csv(path, n):
                 sale_prob *= 1.2
             sale_prob = min(0.95, max(0.3, sale_prob))
             contract_type = "Venta" if random.random() < sale_prob else "Compra"
-            status = "Activa"
 
-            pcompra, pventa = random_prices(brand, creation)
-            update = creation + timedelta(hours=random.randint(0, 200))
+            write_contract(
+                writer=writer,
+                creation=creation,
+                contract_type=contract_type,
+                brand=brand,
+                model=model,
+                line=line,
+                plate=plate,
+                vtype=vtype,
+            )
 
-            row = [
-                contract_type,
-                status,
-                client,
-                client_type,
-                doc,
-                email,
-                phone,
-                user_name,
-                username,
-                user_email,
-                brand,
-                model,
-                line,
-                plate,
-                vtype,
-                "",
-                pcompra,
-                pventa,
-                random.choice(payment_methods),
-                random.choice(payment_terms),
-                random.choice(payment_limitations),
-                random.choice(observations_pool),
-                fmt(creation),
-                fmt(update),
-            ]
-
-            writer.writerow(row)
-
-    print(f"Archivo generado: {Path(path).resolve()}")
+    print(f"Archivo generado: {Path(path).resolve()} (incluye ventas forzadas MT-03)")
 
 
 if __name__ == "__main__":
