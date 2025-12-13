@@ -17,20 +17,20 @@ class PurchaseSaleClient:
     """Cliente HTTP para recuperar contratos de compra/venta via gateway."""
 
     def __init__(self, settings: Settings) -> None:
-        """Configura el cliente con las URLs y token internos."""
         self.settings = settings
         self.base_url = settings.sgivu_purchase_sale_url.rstrip("/")
 
     def _headers(self) -> Dict[str, str]:
-        """Encabezados comunes para llamadas internas entre microservicios."""
+        """Encabezados internos; otros microservicios validan X-Internal-Service-Key."""
         headers = {"Accept": "application/json"}
-        # Los microservicios SGIVU validan la clave interna vía cabecera X-Internal-Service-Key.
         if self.settings.service_internal_secret_key:
-            headers["X-Internal-Service-Key"] = self.settings.service_internal_secret_key
+            headers["X-Internal-Service-Key"] = (
+                self.settings.service_internal_secret_key
+            )
         return headers
 
     async def fetch_contracts(
-            self, start_date: Optional[date] = None, end_date: Optional[date] = None
+        self, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> List[Dict[str, Any]]:
         """Paginación de contratos con filtro temporal opcional.
 
@@ -46,7 +46,7 @@ class PurchaseSaleClient:
         size = 200
 
         async with httpx.AsyncClient(
-                timeout=self.settings.request_timeout_seconds
+            timeout=self.settings.request_timeout_seconds
         ) as client:
             while True:
                 params: Dict[str, Any] = {"page": page, "size": size, "detailed": False}
@@ -80,20 +80,21 @@ class VehicleClient:
     """Cliente HTTP para enriquecer contratos con detalle del inventario."""
 
     def __init__(self, settings: Settings, concurrency: int = 10) -> None:
-        """Inicializa el cliente con control de concurrencia."""
         self.settings = settings
         self.base_url = settings.sgivu_vehicle_url.rstrip("/")
         self._semaphore = asyncio.Semaphore(concurrency)
 
     def _headers(self) -> Dict[str, str]:
-        """Encabezados comunes para llamadas internas entre microservicios."""
+        """Encabezados internos; envía la clave compartida para saltar auth externa."""
         headers = {"Accept": "application/json"}
         if self.settings.service_internal_secret_key:
-            headers["X-Internal-Service-Key"] = self.settings.service_internal_secret_key
+            headers["X-Internal-Service-Key"] = (
+                self.settings.service_internal_secret_key
+            )
         return headers
 
     async def fetch_vehicle(
-            self, vehicle_id: int, vehicle_type: str | None
+        self, vehicle_id: int, vehicle_type: str | None
     ) -> Dict[str, Any]:
         """Obtiene detalle de un vehículo desde el gateway.
 
@@ -108,7 +109,7 @@ class VehicleClient:
 
         async with self._semaphore:
             async with httpx.AsyncClient(
-                    timeout=self.settings.request_timeout_seconds
+                timeout=self.settings.request_timeout_seconds
             ) as client:
                 for endpoint in endpoints:
                     url = f"{self.base_url}/v1/{endpoint}/{vehicle_id}"
@@ -130,7 +131,7 @@ class VehicleClient:
         return {}
 
     async def fetch_bulk(
-            self, vehicles: Iterable[Tuple[int, Optional[str]]]
+        self, vehicles: Iterable[Tuple[int, Optional[str]]]
     ) -> Dict[int, Dict[str, Any]]:
         """Recupera en paralelo múltiples vehículos para minimizar latencia."""
         vehicles = [(vid, vtype) for vid, vtype in vehicles if vid]
@@ -158,13 +159,12 @@ class DemandDatasetLoader:
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
-        """Configura clientes HTTP usando la configuración global."""
         self.settings = settings or get_settings()
         self.purchase_client = PurchaseSaleClient(self.settings)
         self.vehicle_client = VehicleClient(self.settings)
 
     async def load_transactions(
-            self, start_date: Optional[date] = None, end_date: Optional[date] = None
+        self, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> pd.DataFrame:
         """Descarga y fusiona contratos con detalle de vehículo.
 
@@ -212,18 +212,18 @@ class DemandDatasetLoader:
                     "created_at": contract.get("createdAt"),
                     "updated_at": contract.get("updatedAt"),
                     "vehicle_type": vehicle_summary.get("type")
-                                    or vehicle_details.get("vehicleType")
-                                    or vehicle_details.get("type"),
+                    or vehicle_details.get("vehicleType")
+                    or vehicle_details.get("type"),
                     "brand": vehicle_details.get("brand")
-                             or vehicle_summary.get("brand"),
+                    or vehicle_summary.get("brand"),
                     "model": vehicle_details.get("model")
-                             or vehicle_summary.get("model"),
+                    or vehicle_summary.get("model"),
                     "line": vehicle_details.get("line"),
                     "year": vehicle_details.get("year"),
                     "mileage": vehicle_details.get("mileage"),
                     "vehicle_status": vehicle_summary.get("status")
-                                      or vehicle_details.get("status")
-                                      or vehicle_details.get("vehicleStatus"),
+                    or vehicle_details.get("status")
+                    or vehicle_details.get("vehicleStatus"),
                 }
             )
 

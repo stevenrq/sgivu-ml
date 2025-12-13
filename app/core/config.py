@@ -94,7 +94,6 @@ class Settings(BaseSettings):
         file_secret_settings,
     ):
         """Inserta la fuente leniente antes de dotenv y secretos en disco."""
-        # Capa leniente para valores de env que deberían ser listas (evita JSON vacío)
         return (
             init_settings,
             LenientEnvSettingsSource(settings_cls),

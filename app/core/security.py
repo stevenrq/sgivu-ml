@@ -15,15 +15,14 @@ jwt_backend = JsonWebToken(["RS256", "HS256"])
 
 
 class JWKSCache:
-    """Cache simple para JWKS con renovacion basada en tiempo."""
+    """Cache ligero de JWKS con TTL fijo (1h) para reducir llamadas al IdP."""
 
     def __init__(self) -> None:
-        """Inicializa contenedores de cache y timestamp de expiración."""
         self.cached: Dict[str, Any] = {}
         self.expires_at: float = 0.0
 
     async def get_key_set(self, jwks_url: str, timeout: float) -> Any:
-        """Descarga y cachea el JWKS del Authorization Server."""
+        """Descarga el JWKS y lo cachea una hora para amortizar el discovery."""
         if not jwks_url:
             return None
 
@@ -113,7 +112,7 @@ def _extract_permissions(claims: dict) -> Set[str]:
     if raw is None:
         return set()
     if isinstance(raw, str):
-        # Permite formatos separados por espacios o comas.
+        # El issuer legacy entrega scopes separados por espacios o comas.
         parts = [
             token.strip() for token in raw.replace(",", " ").split() if token.strip()
         ]
@@ -124,7 +123,7 @@ def _extract_permissions(claims: dict) -> Set[str]:
 
 
 async def require_token(
-        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
     """Dependencia para proteger endpoints; exige Authorization: Bearer <JWT>."""
     if not credentials or not credentials.credentials:
@@ -157,15 +156,19 @@ def require_internal_or_permissions(required: Iterable[str]):
     required_set = {permission for permission in required if permission}
 
     async def dependency(
-        request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
+        request: Request,
+        credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     ) -> dict:
         """Permite acceso con clave interna o valida permisos sobre un JWT."""
         settings = get_settings()
         internal_key = request.headers.get("X-Internal-Service-Key")
 
         if internal_key:
-            if settings.service_internal_secret_key and internal_key == settings.service_internal_secret_key:
-                # Concede solo los permisos requeridos para satisfacer la validación posterior.
+            if (
+                settings.service_internal_secret_key
+                and internal_key == settings.service_internal_secret_key
+            ):
+                # Inyecta solo los permisos mínimos para reutilizar el mismo flujo de autorización.
                 return {"rolesAndPermissions": list(required_set)}
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

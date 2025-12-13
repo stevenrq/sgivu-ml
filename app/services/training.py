@@ -45,7 +45,7 @@ class TrainingService:
 
     # Agrupamos por tipo+marca+modelo+línea para que el modelo sea específico del segmento exacto.
     category_cols = ["vehicle_type", "brand", "model", "line"]
-    # Sin columnas categóricas opcionales: la línea ahora es obligatoria en el entrenamiento.
+    # Sin categorías opcionales: la línea se volvió obligatoria tras normalizar el segmento.
     optional_category_cols: list[str] = []
     numeric_cols = [
         "purchases_count",
@@ -68,7 +68,6 @@ class TrainingService:
     def __init__(
         self, registry: ModelRegistry, settings: Settings | None = None
     ) -> None:
-        """Inicializa el servicio con repositorio de modelos y configuración."""
         self.registry = registry
         self.settings = settings or get_settings()
 
@@ -79,7 +78,9 @@ class TrainingService:
 
         work_df = df.copy()
         if "line" not in work_df.columns:
-            raise ValueError("La columna 'line' es obligatoria para entrenar el modelo.")
+            raise ValueError(
+                "La columna 'line' es obligatoria para entrenar el modelo."
+            )
         for col in self.category_cols + self.optional_category_cols:
             if col in work_df:
                 work_df[col] = work_df[col].fillna("UNKNOWN").apply(canonicalize_label)
@@ -208,7 +209,7 @@ class TrainingService:
                 ("scaler", StandardScaler()),
             ]
         )
-        # Incluir columnas opcionales de categoria si existen en el dataset de entrenamiento
+        # Solo añade categorías opcionales presentes para evitar fallos cuando faltan columnas.
         return ColumnTransformer(
             transformers=[
                 ("categorical", categorical, self.category_cols + optional_cols),
